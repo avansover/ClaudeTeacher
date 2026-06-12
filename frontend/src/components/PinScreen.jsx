@@ -7,7 +7,7 @@ export default function PinScreen({ onSuccess }) {
   function handleSubmit(e) {
     e.preventDefault();
     // Validate PIN against backend by attempting a ping
-    fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/chat`, {
+    fetch(`${import.meta.env.VITE_API_URL || ''}/api/chat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-app-pin': pin },
       body: JSON.stringify({ studentId: 'lielle', messages: [{ role: 'user', content: 'ping' }] }),

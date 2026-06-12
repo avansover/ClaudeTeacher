@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import MessageBubble from './MessageBubble.jsx';
 import FileUpload from './FileUpload.jsx';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+const API_URL = import.meta.env.VITE_API_URL || '';
 
 const STUDENT_DISPLAY = {
   lielle: { name: 'Lielle', emoji: '🌸' },
