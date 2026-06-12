@@ -8,24 +8,39 @@ const router = express.Router();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-const STUDENT_NAME = process.env.STUDENT_NAME || 'Student';
-const PROFILE_FILE = process.env.PROFILE_FILE || 'daughter1.json';
-const CORE_PROMPT_FILE = process.env.CORE_PROMPT_FILE || 'core.txt';
-const PROFILE_PATH = path.join(__dirname, '..', 'profiles', PROFILE_FILE);
-const CORE_PROMPT_PATH = path.join(__dirname, '..', 'prompts', CORE_PROMPT_FILE);
+const STUDENTS = {
+  lielle: {
+    name: 'Lielle',
+    profileFile: 'daughter1.json',
+    promptFile: 'core_lielle.txt',
+  },
+  agam: {
+    name: 'Agam',
+    profileFile: 'daughter2.json',
+    promptFile: 'core_agam.txt',
+  },
+};
 
-function loadProfile() {
-  return JSON.parse(fs.readFileSync(PROFILE_PATH, 'utf-8'));
+function profilePath(file) {
+  return path.join(__dirname, '..', 'profiles', file);
 }
 
-function saveProfile(profile) {
+function promptPath(file) {
+  return path.join(__dirname, '..', 'prompts', file);
+}
+
+function loadProfile(file) {
+  return JSON.parse(fs.readFileSync(profilePath(file), 'utf-8'));
+}
+
+function saveProfile(file, profile) {
   profile.last_updated = new Date().toISOString();
-  fs.writeFileSync(PROFILE_PATH, JSON.stringify(profile, null, 2));
+  fs.writeFileSync(profilePath(file), JSON.stringify(profile, null, 2));
 }
 
-function buildSystemPrompt(profile) {
-  const core = fs.readFileSync(CORE_PROMPT_PATH, 'utf-8')
-    .replace('{{STUDENT_NAME}}', STUDENT_NAME);
+function buildSystemPrompt(promptFile, profile) {
+  const core = fs.readFileSync(promptPath(promptFile), 'utf-8')
+    .replace('{{STUDENT_NAME}}', profile.name);
 
   const profileSection = `
 STUDENT PROFILE (you may update this as you learn more about the student):
@@ -57,15 +72,19 @@ function extractProfileUpdate(text) {
 }
 
 // POST /api/chat
-// Body: { messages: [{role, content}], files?: [{type, data, mediaType}] }
+// Body: { studentId, messages, files? }
 router.post('/', async (req, res) => {
-  try {
-    const { messages, files } = req.body;
-    const profile = loadProfile();
-    const systemPrompt = buildSystemPrompt(profile);
+  const { studentId, messages, files } = req.body;
 
-    // Build the messages array for Anthropic
-    // If files are attached, add them to the last user message
+  const student = STUDENTS[studentId];
+  if (!student) {
+    return res.status(400).json({ error: 'Invalid student.' });
+  }
+
+  try {
+    const profile = loadProfile(student.profileFile);
+    const systemPrompt = buildSystemPrompt(student.promptFile, profile);
+
     let anthropicMessages = [...messages];
     if (files && files.length > 0) {
       const lastMsg = anthropicMessages[anthropicMessages.length - 1];
@@ -102,10 +121,9 @@ router.post('/', async (req, res) => {
     const rawText = response.content[0].text;
     const { cleanText, update } = extractProfileUpdate(rawText);
 
-    // Apply profile update if Claude sent one
     if (update) {
       const updatedProfile = { ...profile, ...update };
-      saveProfile(updatedProfile);
+      saveProfile(student.profileFile, updatedProfile);
     }
 
     res.json({ message: cleanText });
