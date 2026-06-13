@@ -35,6 +35,31 @@ export async function initSchema() {
       content    TEXT         NOT NULL,
       created_at TIMESTAMPTZ  NOT NULL DEFAULT NOW()
     );
+
+    CREATE TABLE IF NOT EXISTS vocab_words (
+      id             SERIAL       PRIMARY KEY,
+      student_id     VARCHAR(50)  NOT NULL REFERENCES students(id),
+      word           VARCHAR(100) NOT NULL,
+      translation    VARCHAR(200) NOT NULL,
+      rank           INTEGER      NOT NULL DEFAULT 1,
+      priority       VARCHAR(20)  NOT NULL DEFAULT 'normal',
+      attempts       JSONB        NOT NULL DEFAULT '[]',
+      last_practiced TIMESTAMPTZ,
+      added_by       VARCHAR(20)  NOT NULL DEFAULT 'claude',
+      created_at     TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+      UNIQUE(student_id, word)
+    );
+
+    -- Add rank column if upgrading from earlier schema
+    ALTER TABLE vocab_words ADD COLUMN IF NOT EXISTS rank INTEGER NOT NULL DEFAULT 1;
+
+    CREATE TABLE IF NOT EXISTS vocab_games (
+      id         SERIAL       PRIMARY KEY,
+      student_id VARCHAR(50)  NOT NULL REFERENCES students(id),
+      score      INTEGER      NOT NULL,
+      word_count INTEGER      NOT NULL,
+      played_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+    );
   `);
 
   for (const { id, profileFile } of SEED_STUDENTS) {

@@ -133,19 +133,68 @@ One row per completed game session. Stores the score so the rolling average can 
 
 ---
 
-## Word Selection Strategy (8+2)
+## Word Ranks
 
-When a round starts, Claude selects 10 words using this priority order for the 8 scheduled slots:
+Each word in `vocab_words` has a `rank` (1, 2, or 3):
 
-1. **Test-prep words** (`priority = 'test'`) — always fill first, up to 8 slots
-2. **Failed or multiple-choice words from last session** — highest need
-3. **Words not practiced in 7+ days** — overdue
-4. **Words with hint/multiple in recent attempts** — need strengthening
-5. **Words with low recall rate overall** — chronic weakness
+- **Rank 1** — Basic vocabulary: colors, animals, food, body parts, numbers, family, simple verbs, basic adjectives, common places. First 2 years of English.
+- **Rank 2** — Everyday vocabulary: school subjects, emotions, weather, more complex verbs, common adjectives.
+- **Rank 3** — Grade-level vocabulary: more abstract, less common words appropriate for the student's school grade.
 
-The remaining 2 slots are Claude's free choice — age-appropriate common English words the student hasn't seen yet, or words from her profile's noted struggle areas.
+---
 
-If the student has fewer than 8 words in her table, Claude fills all slots with new words it introduces.
+## Word Selection Strategy
+
+Each round is 10 words. The split between ranks is determined by the student's mastery of each rank.
+
+**Mastery** = percentage of words practiced at least once where the last attempt was `recall`, calculated per rank.
+
+### Rank unlock conditions
+
+Before a higher rank can appear, two conditions must both be true:
+
+| Unlock | Min words practiced | Min mastery |
+|---|---|---|
+| Rank-1 → Rank-2 | 75 rank-1 words | 80% |
+| Rank-2 → Rank-3 | 75 rank-2 words | 80% |
+
+The word count threshold (75) ensures the student has a broad enough vocabulary base before harder words are introduced. A student who practiced only 10 words at 100% mastery is not ready for rank-2.
+
+### Rank slot formula
+
+```
+rank2Unlocked = rank1Practiced >= 75 AND rank1Mastery >= 80%
+rank3Unlocked = rank2Practiced >= 75 AND rank2Mastery >= 80%
+
+rank2Slots = rank2Unlocked ? clamp(floor((rank1Mastery - 75) / 5), 0, 5) : 0
+rank3Slots = rank3Unlocked ? floor(rank2Mastery / 100 × rank2Slots) : 0
+rank1Slots = 10 - rank2Slots - rank3Slots
+```
+
+| rank1Mastery | rank2Mastery | rank-1 | rank-2 | rank-3 |
+|---|---|---|---|---|
+| < 80% | any | 10 | 0 | 0 |
+| 80% | 0% | 9 | 1 | 0 |
+| 85% | 0% | 8 | 2 | 0 |
+| 90% | 0% | 7 | 3 | 0 |
+| 95% | 0% | 6 | 4 | 0 |
+| 100% | 0% | 5 | 5 | 0 |
+| 100% | 50% | 3 | 5 | 2 |
+| 100% | 100% | 0 | 5 | 5 |
+
+Once rank-1 is fully replaced by rank-3, it means rank-1 is mastered — no floor enforced.
+
+### Within each rank, word priority order
+
+1. **Test-prep words** (`priority = 'test'`) — always fill first
+2. **Failed or multiple-choice in last attempt** — highest need
+3. **Not practiced in 7+ days** — overdue
+4. **Hint/multiple in recent attempts** — needs strengthening
+5. **Remaining known words** — weakest first
+
+If slots remain unfilled after known words, Claude introduces new words at that rank.
+
+If the student has fewer known words than slots require, Claude fills with new words at the appropriate rank.
 
 ---
 
@@ -225,3 +274,5 @@ VocabGame
 - **SC-004**: Rolling average updates correctly after each completed game and old games beyond 10 are discarded.
 - **SC-005**: Claude's free-choice words are appropriate for a 6th grader (Lielle) or 4th grader (Agam) — no obscure or technical vocabulary.
 - **SC-006**: The vocabulary game is fully accessible without touching the homework chat.
+- **SC-007**: Rank-2 words do not appear until the student has practiced at least 75 rank-1 words at 80%+ mastery.
+- **SC-008**: Word rank is visible to the student during the game and in the results screen (Level 1 / Level 2 / Level 3 badge).

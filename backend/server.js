@@ -4,6 +4,7 @@ import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import chatRouter from './routes/chat.js';
+import vocabRouter from './routes/vocab.js';
 import { initSchema } from './db.js';
 
 const app = express();
@@ -22,6 +23,7 @@ app.use('/api', (req, res, next) => {
 });
 
 app.use('/api/chat', chatRouter);
+app.use('/api/vocab', vocabRouter);
 
 const distPath = path.join(__dirname, '..', 'frontend', 'dist');
 app.use(express.static(distPath));
