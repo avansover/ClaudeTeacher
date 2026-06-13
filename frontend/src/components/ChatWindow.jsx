@@ -14,6 +14,7 @@ export default function ChatWindow({ studentId, pin, onBack }) {
   const [input, setInput] = useState('');
   const [pendingFiles, setPendingFiles] = useState([]);
   const [loading, setLoading] = useState(false);
+  const sessionId = useRef(crypto.randomUUID());
   const bottomRef = useRef(null);
   const textareaRef = useRef(null);
 
@@ -43,6 +44,7 @@ export default function ChatWindow({ studentId, pin, onBack }) {
         },
         body: JSON.stringify({
           studentId,
+          sessionId: sessionId.current,
           messages: newMessages,
           files: pendingFiles.length ? pendingFiles : undefined,
         }),

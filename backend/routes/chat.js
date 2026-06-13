@@ -3,39 +3,19 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import Anthropic from '@anthropic-ai/sdk';
+import { pool } from '../db.js';
 
 const router = express.Router();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 const STUDENTS = {
-  lielle: {
-    name: 'Lielle',
-    profileFile: 'daughter1.json',
-    promptFile: 'core_lielle.txt',
-  },
-  agam: {
-    name: 'Agam',
-    profileFile: 'daughter2.json',
-    promptFile: 'core_agam.txt',
-  },
+  lielle: { name: 'Lielle', promptFile: 'core_lielle.txt' },
+  agam:   { name: 'Agam',   promptFile: 'core_agam.txt' },
 };
-
-function profilePath(file) {
-  return path.join(__dirname, '..', 'profiles', file);
-}
 
 function promptPath(file) {
   return path.join(__dirname, '..', 'prompts', file);
-}
-
-function loadProfile(file) {
-  return JSON.parse(fs.readFileSync(profilePath(file), 'utf-8'));
-}
-
-function saveProfile(file, profile) {
-  profile.last_updated = new Date().toISOString();
-  fs.writeFileSync(profilePath(file), JSON.stringify(profile, null, 2));
 }
 
 function buildSystemPrompt(promptFile, profile) {
@@ -45,9 +25,9 @@ function buildSystemPrompt(promptFile, profile) {
   const profileSection = `
 STUDENT PROFILE (you may update this as you learn more about the student):
 - Name: ${profile.name}
-- Subjects she struggles with: ${profile.subjects_struggling.length ? profile.subjects_struggling.join(', ') : 'none noted yet'}
+- Subjects she struggles with: ${profile.subjects_struggling?.length ? profile.subjects_struggling.join(', ') : 'none noted yet'}
 - Learning style observations: ${profile.learning_style || 'none noted yet'}
-- Progress notes: ${profile.progress_notes.length ? profile.progress_notes.join(' | ') : 'none yet'}
+- Progress notes: ${profile.progress_notes?.length ? profile.progress_notes.join(' | ') : 'none yet'}
 
 If you learn something new about the student during this session that would be useful to remember, include a JSON block at the very end of your response in this exact format (invisible to the student):
 <profile_update>
@@ -72,17 +52,20 @@ function extractProfileUpdate(text) {
 }
 
 // POST /api/chat
-// Body: { studentId, messages, files? }
+// Body: { studentId, sessionId, messages, files? }
 router.post('/', async (req, res) => {
-  const { studentId, messages, files } = req.body;
+  const { studentId, sessionId, messages, files } = req.body;
 
   const student = STUDENTS[studentId];
-  if (!student) {
-    return res.status(400).json({ error: 'Invalid student.' });
-  }
+  if (!student) return res.status(400).json({ error: 'Invalid student.' });
+  if (!sessionId) return res.status(400).json({ error: 'Missing sessionId.' });
 
   try {
-    const profile = loadProfile(student.profileFile);
+    // Load profile from DB
+    const { rows } = await pool.query('SELECT profile FROM students WHERE id = $1', [studentId]);
+    if (!rows.length) return res.status(404).json({ error: 'Student not found.' });
+    const profile = rows[0].profile;
+
     const systemPrompt = buildSystemPrompt(student.promptFile, profile);
 
     let anthropicMessages = messages.slice(-20);
@@ -105,10 +88,7 @@ router.post('/', async (req, res) => {
       }
 
       contentParts.push({ type: 'text', text: lastMsg.content });
-      anthropicMessages[anthropicMessages.length - 1] = {
-        role: 'user',
-        content: contentParts,
-      };
+      anthropicMessages[anthropicMessages.length - 1] = { role: 'user', content: contentParts };
     }
 
     const response = await client.messages.create({
@@ -121,10 +101,27 @@ router.post('/', async (req, res) => {
     const rawText = response.content[0].text;
     const { cleanText, update } = extractProfileUpdate(rawText);
 
+    // Persist profile update if Claude noticed something new
     if (update) {
       const updatedProfile = { ...profile, ...update };
-      saveProfile(student.profileFile, updatedProfile);
+      await pool.query(
+        'UPDATE students SET profile = $1, updated_at = NOW() WHERE id = $2',
+        [JSON.stringify(updatedProfile), studentId]
+      );
     }
+
+    // Ensure session row exists (created on first message)
+    await pool.query(
+      'INSERT INTO sessions (id, student_id) VALUES ($1, $2) ON CONFLICT (id) DO NOTHING',
+      [sessionId, studentId]
+    );
+
+    // Save the user message and assistant response
+    const userMessage = messages[messages.length - 1];
+    await pool.query(
+      'INSERT INTO messages (session_id, role, content) VALUES ($1, $2, $3), ($1, $4, $5)',
+      [sessionId, 'user', userMessage.content, 'assistant', cleanText]
+    );
 
     res.json({ message: cleanText });
   } catch (err) {
