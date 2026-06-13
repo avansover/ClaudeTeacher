@@ -79,7 +79,17 @@ function calcRankSlots(words) {
 // Pick the best known words for a rank slot (weak/overdue first)
 function pickKnownWords(words, rank, count, exclude) {
   const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-  const pool = words.filter(w => w.rank === rank && !exclude.find(e => e.id === w.id));
+  const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+
+  const pool = words.filter(w => {
+    if (w.rank !== rank) return false;
+    if (exclude.find(e => e.id === w.id)) return false;
+    // Don't repeat a word already answered correctly today
+    const attempts = w.attempts || [];
+    const last = attempts[attempts.length - 1];
+    if (w.last_practiced && new Date(w.last_practiced) >= todayStart && last?.result === 'recall') return false;
+    return true;
+  });
 
   // Priority order: test → failed/multiple last → overdue → hint last → rest
   const scored = pool.map(w => {
