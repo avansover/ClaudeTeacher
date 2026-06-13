@@ -85,7 +85,7 @@ router.post('/', async (req, res) => {
     const profile = loadProfile(student.profileFile);
     const systemPrompt = buildSystemPrompt(student.promptFile, profile);
 
-    let anthropicMessages = [...messages];
+    let anthropicMessages = messages.slice(-20);
     if (files && files.length > 0) {
       const lastMsg = anthropicMessages[anthropicMessages.length - 1];
       const contentParts = [];
@@ -112,7 +112,7 @@ router.post('/', async (req, res) => {
     }
 
     const response = await client.messages.create({
-      model: 'claude-sonnet-4-6',
+      model: 'claude-haiku-4-5-20251001',
       max_tokens: 1024,
       system: systemPrompt,
       messages: anthropicMessages,
