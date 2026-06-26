@@ -82,6 +82,7 @@ One row per uploaded educational document. Claude decides whether to create this
 | `type` | `VARCHAR(30)` | `test` / `exercise_page` / `textbook_page` / `worksheet` / `other` |
 | `subject` | `VARCHAR(50)` | Main subject: `math` / `english` / `history` / `science` / `other` |
 | `description` | `TEXT` | Claude's summary of what it saw — 2-4 sentences |
+| `content` | `TEXT` | Claude's full reading of the document. For tests and exercises: each question transcribed with the student's answer and a `[correct]` / `[wrong]` / `[skipped]` annotation inline. Example: `"4. 3×5+4×5+2= student answered 37 [wrong]"`. Used to ask the same or similar questions in future sessions. |
 | `score` | `VARCHAR(20)` | Nullable. Raw score as seen on paper: `"77%"`, `"18/20"`, `"6/10"`. String because formats vary. |
 | `is_reviewed` | `BOOLEAN` | Default `false`. Set to `true` after Claude proactively mentions it to the student. |
 | `uploaded_at` | `TIMESTAMPTZ` | Default `NOW()` |
@@ -134,11 +135,15 @@ Claude uses **tool use** to save documents — same pattern as the vocabulary ga
       },
       "subject": {
         "type": "string",
-        "enum": ["math", "english", "history", "science", "other"]
+        "enum": ["math", "english", "hebrew", "bible", "history", "geography", "science", "other"]
       },
       "description": {
         "type": "string",
         "description": "2-4 sentence summary of what you saw in the document"
+      },
+      "content": {
+        "type": "string",
+        "description": "Full reading of the document. For tests/exercises: transcribe each question with the student's answer and annotate with [correct], [wrong], or [skipped]. Example: '4. 3×5+4×5+2= student answered 37 [wrong]'. For study pages: transcribe the main content. Omit if the image is too blurry to read reliably."
       },
       "score": {
         "type": "string",
@@ -179,25 +184,55 @@ The tool is only offered when the request includes image content. On text-only m
 
 ## Proactive Mentions
 
+### Priority chain
+
+On every new session start, the backend picks **one** topic to surface using this priority order:
+
+1. **Unreviewed documents** (`is_reviewed = false`) — always first. Student hasn't been told about this yet.
+2. **Struggling topics** — if everything is reviewed, find a topic with `performance = 'struggling'` from the most recent document covering it.
+3. **Not-assessed topics** — if nothing is struggling, surface a topic with `performance = 'not_assessed'` (e.g. a study page she hasn't been tested on yet).
+4. **Needs-practice topics** — if nothing is struggling or unassessed, surface a topic with `performance = 'needs_practice'`.
+5. **Nothing** — if all topics are `strong` or no documents exist, Claude starts normally with no proactive mention.
+
+Only one topic is surfaced per session — not a list. The goal is a natural opening, not a report.
+
+### Implementation
+
 On every new session start (first message), the backend checks for unreviewed documents:
 
+The backend runs the priority chain in order, stopping as soon as it finds something to surface:
+
 ```sql
-SELECT d.type, d.subject, d.score, d.description, d.uploaded_at,
+-- Step 1: unreviewed documents
+SELECT d.id, d.type, d.subject, d.score, d.description, d.uploaded_at,
        json_agg(json_build_object('topic', ds.topic, 'performance', ds.performance, 'notes', ds.notes)) AS topics
 FROM documents d
 LEFT JOIN document_subjects ds ON ds.document_id = d.id
 WHERE d.student_id = $1 AND d.is_reviewed = false
-GROUP BY d.id
-ORDER BY d.uploaded_at DESC
-LIMIT 3
+GROUP BY d.id ORDER BY d.uploaded_at DESC LIMIT 1;
+
+-- Step 2: most recent struggling topic (if step 1 empty)
+SELECT ds.topic, ds.notes, d.subject, d.uploaded_at
+FROM document_subjects ds JOIN documents d ON d.id = ds.document_id
+WHERE d.student_id = $1 AND ds.performance = 'struggling'
+ORDER BY d.uploaded_at DESC LIMIT 1;
+
+-- Step 3: most recent not_assessed topic (if step 2 empty)
+-- Step 4: most recent needs_practice topic (if step 3 empty)
+-- (same query, different performance value)
 ```
 
-If rows are returned, a context block is prepended to the system prompt for this session only:
+If something is found, a single context line is prepended to the system prompt:
 
 ```
-UNREVIEWED DOCUMENTS (mention these naturally at the start of the conversation):
-- Math test uploaded 2 days ago. Score: 77%. Topics: long multiplication (needs_practice), fractions (struggling), addition (strong).
-- Exercise page uploaded 5 days ago. Subject: English.
+PROACTIVE MENTION (bring this up naturally at the start of the conversation — one sentence, not a report):
+- Unreviewed math test from 2 days ago. Score: 77%. Fractions: struggling, long multiplication: needs_practice.
+OR
+- Agam has been struggling with fractions (last seen: math test, 3 days ago).
+OR
+- Agam has a history page about the French Revolution that hasn't been assessed yet.
+OR
+- Agam needs more practice with long multiplication.
 ```
 
 After the student acknowledges or Claude mentions a document, the backend marks it reviewed:
