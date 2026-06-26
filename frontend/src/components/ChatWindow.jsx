@@ -57,7 +57,7 @@ export default function ChatWindow({ studentId, pin, onBack }) {
     } catch (err) {
       setMessages(prev => [...prev, {
         role: 'assistant',
-        content: 'Oops, something went wrong. Try again in a moment!',
+        content: `Oops, something went wrong: ${err.message}`,
       }]);
     } finally {
       setLoading(false);

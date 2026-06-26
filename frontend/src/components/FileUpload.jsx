@@ -43,19 +43,40 @@ export default function FileUpload({ onFiles, disabled }) {
   );
 }
 
+const MAX_PX = 1024;
+const JPEG_QUALITY = 0.82;
+
 function fileToBase64(file) {
+  const isPdf = file.type === 'application/pdf';
+
+  if (isPdf) {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve({
+        type: 'pdf', mediaType: 'application/pdf',
+        data: reader.result.split(',')[1], name: file.name,
+      });
+      reader.readAsDataURL(file);
+    });
+  }
+
+  // Resize image to MAX_PX on longest side before encoding
   return new Promise((resolve) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const base64 = reader.result.split(',')[1];
-      const isPdf = file.type === 'application/pdf';
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      const scale = Math.min(1, MAX_PX / Math.max(img.width, img.height));
+      const canvas = document.createElement('canvas');
+      canvas.width  = Math.round(img.width  * scale);
+      canvas.height = Math.round(img.height * scale);
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+      URL.revokeObjectURL(url);
       resolve({
-        type: isPdf ? 'pdf' : 'image',
-        mediaType: file.type,
-        data: base64,
+        type: 'image', mediaType: 'image/jpeg',
+        data: canvas.toDataURL('image/jpeg', JPEG_QUALITY).split(',')[1],
         name: file.name,
       });
     };
-    reader.readAsDataURL(file);
+    img.src = url;
   });
 }
