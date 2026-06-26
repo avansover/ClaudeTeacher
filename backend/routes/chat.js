@@ -68,7 +68,26 @@ router.post('/', async (req, res) => {
 
     const systemPrompt = buildSystemPrompt(student.promptFile, profile);
 
-    let anthropicMessages = messages.slice(-20);
+    // On the first message of a new session, prepend the last 2 sessions for continuity
+    let priorMessages = [];
+    if (messages.length === 1) {
+      const { rows: prior } = await pool.query(
+        `SELECT m.role, m.content
+         FROM messages m
+         WHERE m.session_id IN (
+           SELECT id FROM sessions
+           WHERE student_id = $1 AND id != $2
+           ORDER BY started_at DESC
+           LIMIT 2
+         )
+         ORDER BY m.created_at ASC
+         LIMIT 20`,
+        [studentId, sessionId]
+      );
+      priorMessages = prior.map(r => ({ role: r.role, content: r.content }));
+    }
+
+    let anthropicMessages = [...priorMessages, ...messages].slice(-20);
     if (files && files.length > 0) {
       const lastMsg = anthropicMessages[anthropicMessages.length - 1];
       const contentParts = [];
