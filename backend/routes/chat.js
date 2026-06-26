@@ -87,7 +87,7 @@ router.post('/', async (req, res) => {
         }
       }
 
-      contentParts.push({ type: 'text', text: lastMsg.content });
+      if (lastMsg.content) contentParts.push({ type: 'text', text: lastMsg.content });
       anthropicMessages[anthropicMessages.length - 1] = { role: 'user', content: contentParts };
     }
 
