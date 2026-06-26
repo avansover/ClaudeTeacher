@@ -43,8 +43,9 @@ export default function FileUpload({ onFiles, disabled }) {
   );
 }
 
-const MAX_PX = 1024;
-const JPEG_QUALITY = 0.82;
+const COMPRESS_THRESHOLD = 1.5 * 1024 * 1024; // only compress if over 1.5MB
+const MAX_PX = 1600;
+const JPEG_QUALITY = 0.88;
 
 function fileToBase64(file) {
   const isPdf = file.type === 'application/pdf';
@@ -60,7 +61,19 @@ function fileToBase64(file) {
     });
   }
 
-  // Resize image to MAX_PX on longest side before encoding
+  // Small images (already compressed by WhatsApp etc.) go through as-is
+  if (file.size < COMPRESS_THRESHOLD) {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve({
+        type: 'image', mediaType: file.type || 'image/jpeg',
+        data: reader.result.split(',')[1], name: file.name,
+      });
+      reader.readAsDataURL(file);
+    });
+  }
+
+  // Large images: resize to MAX_PX on longest side
   return new Promise((resolve) => {
     const url = URL.createObjectURL(file);
     const img = new Image();
