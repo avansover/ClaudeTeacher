@@ -28,7 +28,7 @@ export default function ChatWindow({ studentId, pin, onBack }) {
     const text = input.trim();
     if (!text && pendingFiles.length === 0) return;
 
-    const userMessage = { role: 'user', content: text };
+    const userMessage = { role: 'user', content: text || (pendingFiles.length ? '[תמונה]' : '') };
     const newMessages = [...messages, userMessage];
     setMessages(newMessages);
     setInput('');

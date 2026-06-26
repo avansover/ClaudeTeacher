@@ -87,7 +87,9 @@ router.post('/', async (req, res) => {
       priorMessages = prior.map(r => ({ role: r.role, content: r.content }));
     }
 
-    let anthropicMessages = [...priorMessages, ...messages].slice(-20);
+    let anthropicMessages = [...priorMessages, ...messages]
+      .filter(m => m.content && (typeof m.content === 'string' ? m.content.trim() : m.content.length > 0))
+      .slice(-20);
     if (files && files.length > 0) {
       const lastMsg = anthropicMessages[anthropicMessages.length - 1];
       const contentParts = [];
