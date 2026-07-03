@@ -61,6 +61,31 @@ export async function initSchema() {
       played_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW()
     );
 
+    CREATE TABLE IF NOT EXISTS work_pages (
+      id         SERIAL       PRIMARY KEY,
+      student_id VARCHAR(50)  NOT NULL REFERENCES students(id),
+      title      VARCHAR(200) NOT NULL,
+      subject    VARCHAR(50)  NOT NULL,
+      mode       VARCHAR(20)  NOT NULL DEFAULT 'flexible',
+      status     VARCHAR(20)  NOT NULL DEFAULT 'draft',
+      locked_at  TIMESTAMPTZ,
+      due_date   TIMESTAMPTZ,
+      created_at TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS exercises (
+      id          SERIAL       PRIMARY KEY,
+      page_id     INTEGER      NOT NULL REFERENCES work_pages(id),
+      order_index INTEGER      NOT NULL,
+      description TEXT         NOT NULL,
+      subject     VARCHAR(50)  NOT NULL,
+      difficulty  VARCHAR(20)  NOT NULL DEFAULT 'medium',
+      status      VARCHAR(20)  NOT NULL DEFAULT 'pending',
+      attempts    JSONB        NOT NULL DEFAULT '[]',
+      solved_at   TIMESTAMPTZ,
+      created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+    );
+
     CREATE TABLE IF NOT EXISTS documents (
       id          SERIAL       PRIMARY KEY,
       student_id  VARCHAR(50)  NOT NULL REFERENCES students(id),

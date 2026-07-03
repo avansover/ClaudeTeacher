@@ -5,6 +5,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import chatRouter from './routes/chat.js';
 import vocabRouter from './routes/vocab.js';
+import parentRouter from './routes/parent.js';
 import { initSchema } from './db.js';
 
 const app = express();
@@ -13,6 +14,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 app.use(cors({ origin: process.env.CORS_ORIGIN || 'http://localhost:5173' }));
 app.use(express.json({ limit: '20mb' }));
+
+app.use('/api/parent', parentRouter); // parent has its own PIN middleware
 
 app.use('/api', (req, res, next) => {
   const pin = req.headers['x-app-pin'];

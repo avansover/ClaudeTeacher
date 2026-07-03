@@ -1,26 +1,41 @@
 import { useState } from 'react';
 
+const API = import.meta.env.VITE_API_URL || '';
+
 export default function PinScreen({ onSuccess }) {
   const [pin, setPin] = useState('');
   const [error, setError] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault();
-    // Validate PIN against backend by attempting a ping
-    fetch(`${import.meta.env.VITE_API_URL || ''}/api/chat`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-app-pin': pin },
-      body: JSON.stringify({ studentId: 'lielle', messages: [{ role: 'user', content: 'ping' }] }),
-    })
-      .then(res => {
-        if (res.status === 401) {
-          setError(true);
-          setPin('');
-        } else {
-          onSuccess(pin);
-        }
-      })
-      .catch(() => setError(true));
+    if (!pin) return;
+    setLoading(true);
+    setError(false);
+
+    try {
+      // Try parent PIN first
+      const parentRes = await fetch(`${API}/api/parent/auth`, {
+        method: 'POST',
+        headers: { 'x-parent-pin': pin },
+      });
+      if (parentRes.ok) return onSuccess(pin, 'parent');
+
+      // Try student PIN
+      const studentRes = await fetch(`${API}/api/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-app-pin': pin },
+        body: JSON.stringify({ studentId: 'lielle', messages: [{ role: 'user', content: 'ping' }] }),
+      });
+      if (studentRes.status !== 401) return onSuccess(pin, 'student');
+
+      setError(true);
+      setPin('');
+    } catch {
+      setError(true);
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -41,6 +56,7 @@ export default function PinScreen({ onSuccess }) {
           placeholder="••••"
           maxLength={8}
           autoFocus
+          disabled={loading}
           style={{
             fontSize: 28,
             letterSpacing: 8,
@@ -53,20 +69,18 @@ export default function PinScreen({ onSuccess }) {
             background: 'var(--surface)',
           }}
         />
-        {error && (
-          <div style={{ color: '#e74c3c', fontSize: 14 }}>Wrong PIN, try again</div>
-        )}
+        {error && <div style={{ color: '#e74c3c', fontSize: 14 }}>Wrong PIN, try again</div>}
         <button
           type="submit"
-          disabled={!pin}
+          disabled={!pin || loading}
           style={{
             background: 'var(--primary)', color: '#fff', border: 'none',
             borderRadius: 12, padding: '12px 32px', fontSize: 16,
-            fontWeight: 700, cursor: pin ? 'pointer' : 'not-allowed',
-            opacity: pin ? 1 : 0.5,
+            fontWeight: 700, cursor: pin && !loading ? 'pointer' : 'not-allowed',
+            opacity: pin && !loading ? 1 : 0.5,
           }}
         >
-          Let's go!
+          {loading ? '...' : "Let's go!"}
         </button>
       </form>
     </div>
