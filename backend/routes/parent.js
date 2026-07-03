@@ -74,7 +74,7 @@ router.post('/chat', async (req, res) => {
   const student = STUDENTS[studentId];
   if (!student) return res.status(400).json({ error: 'Invalid student.' });
 
-  const system = `You are a teaching assistant helping Amir plan educational work pages for his daughter ${student.name} (${student.grade}).
+  const system = `You are a teaching assistant helping Amir plan educational work pages for his daughter ${student.name} (${student.grade}). ${student.name} is a girl.
 Help him design clear, practical exercises. Ask about subject, number of exercises, difficulty level, and specific topics if not specified.
 Once you have enough information, propose a concrete list of exercises so Amir can review and lock them in.
 Be concise. Respond in whatever language Amir uses (Hebrew or English).`;
