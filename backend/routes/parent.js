@@ -156,7 +156,7 @@ router.post('/pages/lock', async (req, res) => {
       await pool.query(
         `INSERT INTO exercises (page_id, order_index, description, subject, difficulty)
          VALUES ($1, $2, $3, $4, $5)`,
-        [page.id, i, ex.description, data.subject, ex.difficulty]
+        [page.id, i, ex.description, lockedSubject, ex.difficulty]
       );
     }
 
