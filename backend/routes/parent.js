@@ -106,7 +106,7 @@ router.post('/pages/lock', async (req, res) => {
   try {
     const result = await client.messages.create({
       model: MODEL,
-      max_tokens: 2048,
+      max_tokens: 4096,
       system: `You are extracting structured exercise data from a planning conversation. The conversation may be in Hebrew or English. All exercises are for the subject: ${lockedSubject}. Your job is to identify every exercise that was discussed and agreed upon, and save them using the save_work_page tool. Write each exercise description clearly so the student can understand what to do — in the same language used in the conversation.`,
       tools: [{
         name: 'save_work_page',
@@ -137,7 +137,12 @@ router.post('/pages/lock', async (req, res) => {
       ],
     });
 
-    const data = result.content[0].input;
+    const toolBlock = result.content.find(b => b.type === 'tool_use');
+    if (!toolBlock) {
+      console.error('Lock page: no tool_use block. stop_reason:', result.stop_reason, 'content:', JSON.stringify(result.content));
+      return res.status(400).json({ error: 'Could not extract exercises — try shortening the conversation.' });
+    }
+    const data = toolBlock.input;
     if (!data.exercises?.length) return res.status(400).json({ error: 'No exercises found in conversation.' });
 
     const { rows: [page] } = await pool.query(
