@@ -70,13 +70,15 @@ router.get('/pages/:studentId', async (req, res) => {
 
 // POST /api/parent/chat — planning conversation with Claude
 router.post('/chat', async (req, res) => {
-  const { studentId, messages } = req.body;
+  const { studentId, subject, messages } = req.body;
   const student = STUDENTS[studentId];
   if (!student) return res.status(400).json({ error: 'Invalid student.' });
 
-  const system = `You are a teaching assistant helping Amir plan educational work pages for his daughter ${student.name} (${student.grade}). ${student.name} is a girl.
-Help him design clear, practical exercises. Ask about subject, number of exercises, difficulty level, and specific topics if not specified.
-Once you have enough information, propose a concrete list of exercises so Amir can review and lock them in.
+  const subjectLabel = subject || 'general';
+  const system = `You are a teaching assistant helping Amir plan a ${subjectLabel} work page for his daughter ${student.name} (${student.grade}). ${student.name} is a girl.
+This page is for ${subjectLabel} ONLY — all exercises must be ${subjectLabel} exercises. Do not mix in other subjects.
+Help him design clear, practical exercises. Ask about number of exercises, difficulty level, and specific topics if not specified.
+Once you have enough information, propose a concrete numbered list of exercises so Amir can review and lock them in.
 Be concise. Respond in whatever language Amir uses (Hebrew or English).`;
 
   try {
@@ -96,23 +98,23 @@ Be concise. Respond in whatever language Amir uses (Hebrew or English).`;
 
 // POST /api/parent/pages/lock — extract structured exercises from chat history and save as active page
 router.post('/pages/lock', async (req, res) => {
-  const { studentId, messages, mode, dueDate } = req.body;
+  const { studentId, subject, messages, mode, dueDate } = req.body;
   const student = STUDENTS[studentId];
   if (!student) return res.status(400).json({ error: 'Invalid student.' });
+  const lockedSubject = (subject && SUBJECTS.includes(subject)) ? subject : 'other';
 
   try {
     const result = await client.messages.create({
       model: MODEL,
       max_tokens: 2048,
-      system: 'You are extracting structured exercise data from a planning conversation. The conversation may be in Hebrew or English. Your job is to identify every exercise that was discussed and agreed upon, and save them using the save_work_page tool. Write each exercise description clearly so the student can understand what to do — in the same language used in the conversation.',
+      system: `You are extracting structured exercise data from a planning conversation. The conversation may be in Hebrew or English. All exercises are for the subject: ${lockedSubject}. Your job is to identify every exercise that was discussed and agreed upon, and save them using the save_work_page tool. Write each exercise description clearly so the student can understand what to do — in the same language used in the conversation.`,
       tools: [{
         name: 'save_work_page',
         description: 'Extract and save the agreed work page and exercises from the conversation',
         input_schema: {
           type: 'object',
           properties: {
-            title:   { type: 'string', description: 'Short descriptive title for this work page' },
-            subject: { type: 'string', enum: SUBJECTS },
+            title: { type: 'string', description: 'Short descriptive title for this work page' },
             exercises: {
               type: 'array',
               items: {
@@ -125,7 +127,7 @@ router.post('/pages/lock', async (req, res) => {
               },
             },
           },
-          required: ['title', 'subject', 'exercises'],
+          required: ['title', 'exercises'],
         },
       }],
       tool_choice: { type: 'tool', name: 'save_work_page' },
@@ -141,7 +143,7 @@ router.post('/pages/lock', async (req, res) => {
     const { rows: [page] } = await pool.query(
       `INSERT INTO work_pages (student_id, title, subject, mode, status, locked_at, due_date)
        VALUES ($1, $2, $3, $4, 'active', NOW(), $5) RETURNING *`,
-      [studentId, data.title, data.subject, mode || 'flexible', dueDate || null]
+      [studentId, data.title, lockedSubject, mode || 'flexible', dueDate || null]
     );
 
     for (let i = 0; i < data.exercises.length; i++) {

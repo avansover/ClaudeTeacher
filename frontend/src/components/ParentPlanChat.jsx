@@ -7,11 +7,23 @@ const MODES = [
   { value: 'strict',   label: '🔒 Strict',   desc: 'Claude stays on this page until 100% done' },
 ];
 
+const SUBJECTS = [
+  { value: 'math',      label: '🔢 Math' },
+  { value: 'english',   label: '🔤 English' },
+  { value: 'hebrew',    label: '📖 Hebrew' },
+  { value: 'bible',     label: '✡️ Bible' },
+  { value: 'history',   label: '🏛️ History' },
+  { value: 'geography', label: '🌍 Geography' },
+  { value: 'science',   label: '🔬 Science' },
+  { value: 'other',     label: '📚 Other' },
+];
+
 export default function ParentPlanChat({ studentId, studentName, parentPin, onBack }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [mode, setMode] = useState('flexible');
+  const [subject, setSubject] = useState('math');
   const [dueDate, setDueDate] = useState('');
   const [locking, setLocking] = useState(false);
   const [locked, setLocked] = useState(null); // { title, exerciseCount }
@@ -36,7 +48,7 @@ export default function ParentPlanChat({ studentId, studentName, parentPin, onBa
       const res = await fetch(`${API}/api/parent/chat`, {
         method: 'POST',
         headers,
-        body: JSON.stringify({ studentId, messages: newMessages }),
+        body: JSON.stringify({ studentId, subject, messages: newMessages }),
       });
       const data = await res.json();
       setMessages(prev => [...prev, { role: 'assistant', content: data.message }]);
@@ -56,6 +68,7 @@ export default function ParentPlanChat({ studentId, studentName, parentPin, onBa
         headers,
         body: JSON.stringify({
           studentId,
+          subject,
           messages,
           mode,
           dueDate: dueDate || null,
@@ -82,7 +95,7 @@ export default function ParentPlanChat({ studentId, studentName, parentPin, onBa
         <div style={{ fontSize: 20, fontWeight: 700, textAlign: 'center' }}>Page Locked!</div>
         <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: 15 }}>
           <strong>{locked.title}</strong><br />
-          {locked.exerciseCount} exercises · {mode} mode<br />
+          {SUBJECTS.find(s => s.value === subject)?.label} · {locked.exerciseCount} exercises · {mode} mode<br />
           {studentName} will see this next time she opens the app.
         </div>
         <button onClick={onBack} style={{
@@ -118,6 +131,21 @@ export default function ParentPlanChat({ studentId, studentName, parentPin, onBa
         borderBottom: '1px solid var(--border)',
         display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap',
       }}>
+        {/* Subject */}
+        <select
+          value={subject}
+          onChange={e => setSubject(e.target.value)}
+          disabled={messages.length > 0}
+          style={{
+            padding: '5px 10px', borderRadius: 8, border: '2px solid var(--primary)',
+            background: 'var(--bg)', color: 'var(--text)', fontSize: 13, fontFamily: 'inherit',
+            cursor: messages.length > 0 ? 'not-allowed' : 'pointer', fontWeight: 600,
+          }}
+        >
+          {SUBJECTS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+        </select>
+
+        {/* Mode */}
         <div style={{ display: 'flex', gap: 8 }}>
           {MODES.map(m => (
             <button
