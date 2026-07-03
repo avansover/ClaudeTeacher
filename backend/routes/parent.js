@@ -175,4 +175,15 @@ router.post('/pages/:id/unlock', async (req, res) => {
   }
 });
 
+// DELETE /api/parent/pages/:id — permanently delete a page and its exercises
+router.delete('/pages/:id', async (req, res) => {
+  try {
+    await pool.query(`DELETE FROM exercises WHERE page_id = $1`, [req.params.id]);
+    await pool.query(`DELETE FROM work_pages WHERE id = $1`, [req.params.id]);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to delete page.' });
+  }
+});
+
 export default router;

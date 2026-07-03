@@ -34,6 +34,13 @@ export default function ParentDashboard({ parentPin, onLogout }) {
     loadStudents();
   }
 
+  async function deletePage(pageId, studentId) {
+    if (!window.confirm('Delete this page and all its exercises? This cannot be undone.')) return;
+    await fetch(`${API}/api/parent/pages/${pageId}`, { method: 'DELETE', headers });
+    loadPages(studentId);
+    loadStudents();
+  }
+
   useEffect(() => { loadStudents(); }, []);
 
   if (planning) {
@@ -132,21 +139,38 @@ export default function ParentDashboard({ parentPin, onLogout }) {
                     background: 'var(--bg)', borderRadius: 10, padding: '10px 14px',
                     border: '1px solid var(--border)', fontSize: 13,
                   }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                       <span style={{ fontWeight: 700 }}>{page.title}</span>
                       <StatusBadge status={page.status} />
                     </div>
-                    <div style={{ color: 'var(--text-muted)', marginBottom: 6 }}>
-                      {page.subject} · {page.mode} · {page.done}/{page.total} exercises
+                    <div style={{ color: 'var(--text-muted)', marginBottom: 6, fontSize: 12 }}>
+                      {page.subject} · {page.mode}
                     </div>
-                    {page.status === 'active' && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+                      <div style={{ flex: 1 }}>
+                        <ProgressBar value={pct(page)} color={STUDENT_COLORS[s.id]} />
+                      </div>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: STUDENT_COLORS[s.id], flexShrink: 0 }}>
+                        {page.done}/{page.total} solved · {pct(page)}%
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
+                      {page.status === 'active' && (
+                        <button
+                          onClick={() => unlockPage(page.id, s.id)}
+                          title="Hides the page from the student — exercises are preserved as draft"
+                          style={{ fontSize: 12, background: 'none', border: '1px solid var(--border)', borderRadius: 6, padding: '3px 8px', cursor: 'pointer', color: 'var(--text-muted)' }}
+                        >
+                          ⏸ Deactivate
+                        </button>
+                      )}
                       <button
-                        onClick={() => unlockPage(page.id, s.id)}
-                        style={{ fontSize: 12, background: 'none', border: '1px solid var(--border)', borderRadius: 6, padding: '3px 8px', cursor: 'pointer', color: 'var(--text-muted)' }}
+                        onClick={() => deletePage(page.id, s.id)}
+                        style={{ fontSize: 12, background: 'none', border: '1px solid #e74c3c', borderRadius: 6, padding: '3px 8px', cursor: 'pointer', color: '#e74c3c' }}
                       >
-                        Unlock to edit
+                        🗑 Delete
                       </button>
-                    )}
+                    </div>
                     {page.exercises && page.exercises.length > 0 && (
                       <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
                         {page.exercises.map((ex, i) => (
