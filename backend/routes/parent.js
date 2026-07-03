@@ -103,7 +103,8 @@ router.post('/pages/lock', async (req, res) => {
   try {
     const result = await client.messages.create({
       model: MODEL,
-      max_tokens: 1024,
+      max_tokens: 2048,
+      system: 'You are extracting structured exercise data from a planning conversation. The conversation may be in Hebrew or English. Your job is to identify every exercise that was discussed and agreed upon, and save them using the save_work_page tool. Write each exercise description clearly so the student can understand what to do — in the same language used in the conversation.',
       tools: [{
         name: 'save_work_page',
         description: 'Extract and save the agreed work page and exercises from the conversation',
@@ -130,7 +131,7 @@ router.post('/pages/lock', async (req, res) => {
       tool_choice: { type: 'tool', name: 'save_work_page' },
       messages: [
         ...messages.slice(-20),
-        { role: 'user', content: 'Extract the agreed exercises and save the work page now.' },
+        { role: 'user', content: 'Extract ALL the exercises from this conversation and call save_work_page. Include every exercise that was discussed — do not skip any. Write each description clearly.' },
       ],
     });
 
