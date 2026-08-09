@@ -1,6 +1,7 @@
 import express from 'express';
 import Anthropic from '@anthropic-ai/sdk';
 import { pool } from '../db.js';
+import { RANK_CATEGORIES } from './vocab.js';
 
 const router = express.Router();
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -188,6 +189,109 @@ router.delete('/pages/:id', async (req, res) => {
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: 'Failed to delete page.' });
+  }
+});
+
+// POST /api/parent/vocab/classify — Claude proposes translation + rank for words the parent typed, without saving
+router.post('/vocab/classify', async (req, res) => {
+  const { studentId, text } = req.body;
+  const student = STUDENTS[studentId];
+  if (!student) return res.status(400).json({ error: 'Invalid student.' });
+  if (!text?.trim()) return res.status(400).json({ error: 'No words provided.' });
+
+  const rubric = Object.entries(RANK_CATEGORIES).map(([rank, desc]) => `Rank ${rank}: ${desc}`).join('\n');
+
+  try {
+    const result = await client.messages.create({
+      model: MODEL,
+      max_tokens: 1024,
+      tools: [{
+        name: 'classify_words',
+        description: 'Return each distinct English word found, with its Hebrew translation and difficulty rank',
+        input_schema: {
+          type: 'object',
+          properties: {
+            words: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  word:        { type: 'string', description: 'The English word, lowercase' },
+                  translation: { type: 'string', description: 'Most common simple Hebrew translation' },
+                  rank:        { type: 'integer', enum: [1, 2, 3], description: 'Difficulty rank per the rubric' },
+                  priority:    { type: 'string', enum: ['normal', 'test'], description: '"test" only if the parent mentioned a specific upcoming test/exam' },
+                },
+                required: ['word', 'translation', 'rank', 'priority'],
+              },
+            },
+          },
+          required: ['words'],
+        },
+      }],
+      tool_choice: { type: 'tool', name: 'classify_words' },
+      messages: [{
+        role: 'user',
+        content: `Student: ${student.name}, ${student.grade}, Israeli, English vocabulary below grade level (COVID/wartime gap).
+
+Difficulty rubric:
+${rubric}
+
+Parent's note (may be Hebrew or English, may mention a test/exam):
+"${text}"
+
+Extract every distinct English word mentioned and classify each one.`,
+      }],
+    });
+
+    const toolBlock = result.content.find(b => b.type === 'tool_use');
+    if (!toolBlock?.input?.words?.length) return res.status(400).json({ error: 'No words found in that text.' });
+    res.json({ words: toolBlock.input.words });
+  } catch (err) {
+    console.error('Vocab classify error:', err);
+    res.status(500).json({ error: 'Could not classify words.' });
+  }
+});
+
+// POST /api/parent/vocab/add — save (possibly parent-edited) classified words
+router.post('/vocab/add', async (req, res) => {
+  const { studentId, words } = req.body;
+  if (!STUDENTS[studentId]) return res.status(400).json({ error: 'Invalid student.' });
+  if (!Array.isArray(words) || !words.length) return res.status(400).json({ error: 'No words provided.' });
+
+  try {
+    const saved = [];
+    for (const w of words) {
+      if (!w.word || !w.translation) continue;
+      const { rows } = await pool.query(
+        `INSERT INTO vocab_words (student_id, word, translation, rank, priority, added_by)
+         VALUES ($1, $2, $3, $4, $5, 'parent')
+         ON CONFLICT (student_id, word) DO UPDATE
+           SET translation = EXCLUDED.translation, rank = EXCLUDED.rank,
+               priority = EXCLUDED.priority, added_by = 'parent'
+         RETURNING *`,
+        [studentId, w.word.toLowerCase().trim(), w.translation, w.rank || 1, w.priority || 'normal']
+      );
+      saved.push(rows[0]);
+    }
+    res.json({ words: saved });
+  } catch (err) {
+    console.error('Vocab add error:', err);
+    res.status(500).json({ error: 'Could not save words.' });
+  }
+});
+
+// GET /api/parent/vocab/:studentId — full word list for one student
+router.get('/vocab/:studentId', async (req, res) => {
+  if (!STUDENTS[req.params.studentId]) return res.status(400).json({ error: 'Invalid student.' });
+  try {
+    const { rows } = await pool.query(
+      `SELECT * FROM vocab_words WHERE student_id = $1 ORDER BY priority DESC, last_practiced ASC NULLS FIRST`,
+      [req.params.studentId]
+    );
+    res.json({ words: rows });
+  } catch (err) {
+    console.error('Vocab list error:', err);
+    res.status(500).json({ error: 'Could not load words.' });
   }
 });
 

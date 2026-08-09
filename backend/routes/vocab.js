@@ -114,7 +114,7 @@ function wordScore(stage) {
   return 0;
 }
 
-const RANK_CATEGORIES = {
+export const RANK_CATEGORIES = {
   1: `Basic vocabulary ONLY — colors, animals, food, drinks, body parts, numbers, family members, school objects, simple verbs (run/eat/sleep), basic adjectives (big/small/hot/cold), common places (home/school/park). First 2 years of English. No abstract words.`,
   2: `Everyday vocabulary — school subjects, emotions, weather, more complex verbs (decide/explain/choose), common adjectives (difficult/careful/important), transport, sports, clothing. Intermediate level.`,
   3: `Grade-level vocabulary — more abstract or less common words appropriate for the student's school grade. Still useful everyday words but less frequent.`,

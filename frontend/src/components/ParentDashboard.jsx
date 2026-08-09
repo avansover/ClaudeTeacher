@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import ParentPlanChat from './ParentPlanChat.jsx';
+import ParentVocabWords from './ParentVocabWords.jsx';
 
 const API = import.meta.env.VITE_API_URL || '';
 
@@ -10,6 +11,7 @@ export default function ParentDashboard({ parentPin, onLogout }) {
   const [students, setStudents] = useState([]);
   const [planning, setPlanning] = useState(null); // { studentId, studentName }
   const [viewingPages, setViewingPages] = useState(null); // { studentId, pages }
+  const [vocabView, setVocabView] = useState(null); // { studentId, studentName }
   const [loading, setLoading] = useState(true);
 
   const headers = { 'x-parent-pin': parentPin };
@@ -50,6 +52,17 @@ export default function ParentDashboard({ parentPin, onLogout }) {
         studentName={planning.studentName}
         parentPin={parentPin}
         onBack={() => { setPlanning(null); loadStudents(); }}
+      />
+    );
+  }
+
+  if (vocabView) {
+    return (
+      <ParentVocabWords
+        studentId={vocabView.studentId}
+        studentName={vocabView.studentName}
+        parentPin={parentPin}
+        onBack={() => setVocabView(null)}
       />
     );
   }
@@ -125,6 +138,12 @@ export default function ParentDashboard({ parentPin, onLogout }) {
                 style={outlineBtnStyle(STUDENT_COLORS[s.id])}
               >
                 📋 {viewingPages?.studentId === s.id ? 'Hide Pages' : 'View Pages'}
+              </button>
+              <button
+                onClick={() => setVocabView({ studentId: s.id, studentName: s.name })}
+                style={outlineBtnStyle(STUDENT_COLORS[s.id])}
+              >
+                📖 Words
               </button>
             </div>
 
