@@ -1,3 +1,25 @@
+// Claude's replies use light markdown (**bold**, --- dividers) — render it instead of showing raw asterisks/dashes
+function renderContent(content) {
+  return content.split('\n').map((line, i) => {
+    if (line.trim() === '---') {
+      return <hr key={i} style={{ border: 'none', borderTop: '1px solid currentColor', opacity: 0.15, margin: '8px 0' }} />;
+    }
+    if (line === '') {
+      return <div key={i}>&nbsp;</div>;
+    }
+    const parts = line.split(/(\*\*[^*]+\*\*)/g).filter(Boolean);
+    return (
+      <div key={i}>
+        {parts.map((part, j) => (
+          part.startsWith('**') && part.endsWith('**')
+            ? <strong key={j}>{part.slice(2, -2)}</strong>
+            : part
+        ))}
+      </div>
+    );
+  });
+}
+
 export default function MessageBubble({ role, content }) {
   const isUser = role === 'user';
 
@@ -33,10 +55,9 @@ export default function MessageBubble({ role, content }) {
         lineHeight: '1.55',
         direction: isRtl ? 'rtl' : 'ltr',
         textAlign: isRtl ? 'right' : 'left',
-        whiteSpace: 'pre-wrap',
         wordBreak: 'break-word',
       }}>
-        {content}
+        {renderContent(content)}
       </div>
     </div>
   );
