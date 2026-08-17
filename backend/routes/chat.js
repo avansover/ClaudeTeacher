@@ -46,13 +46,17 @@ const SAVE_DOCUMENT_TOOL = {
 
 const MARK_EXERCISE_TOOL = {
   name: 'mark_exercise',
-  description: 'Mark a work page exercise as solved, attempted, or skipped. Call this as soon as the student correctly completes an exercise or when skipping.',
+  description: `Record the outcome of the CURRENT work page exercise (the exercise_id given in the WORK PAGE section of your system prompt) — but ONLY after you have actually presented that exact exercise's description to the student in THIS conversation and worked through it with her. Never call this for an exercise you have not personally shown her in this session, and never guess or assume an exercise was completed.
+
+status="solved" — use ONLY if she reached and confirmed the correct final answer to this specific exercise in this conversation. Do not use "solved" just because she says she's "done" or wants to move on — if you did not personally verify the answer with her here, it is not solved.
+status="skipped" — use if she wants to stop or move past this exercise without solving it. This is the correct status for "let's skip this" or "I don't want to do this one" — do not use "solved" for that.
+status="attempted" — use if she engaged with it genuinely but didn't reach the correct answer.`,
   input_schema: {
     type: 'object',
     properties: {
-      exercise_id: { type: 'number', description: 'The exercise ID provided in the work page context' },
+      exercise_id: { type: 'number', description: 'The exercise ID provided in the work page context — must match the exercise you actually discussed' },
       status: { type: 'string', enum: ['solved', 'attempted', 'skipped'] },
-      notes: { type: 'string', description: 'Brief note about how the student did' },
+      notes: { type: 'string', description: 'Brief, factual note about what actually happened in this conversation — never describe a solve that did not take place' },
     },
     required: ['exercise_id', 'status'],
   },
@@ -174,7 +178,7 @@ async function buildWorkPageContext(studentId) {
     : 'FLEXIBLE MODE: open with a brief mention of the work page, then follow the student\'s lead if she wants to work on something else.';
 
   return {
-    context: `\n\nWORK PAGE (${modeInstr})\nTitle: "${page.title}" | Subject: ${page.subject} | Progress: ${page.done}/${page.total} (${pct}%).${dueStr}\nCurrent exercise (id=${ex.id}, difficulty=${ex.difficulty}): "${ex.description}"\nWhen the student correctly solves this exercise, call mark_exercise with exercise_id=${ex.id} and status="solved". Call it with status="attempted" if she tries but doesn't get it right yet.`,
+    context: `\n\nWORK PAGE (${modeInstr})\nTitle: "${page.title}" | Subject: ${page.subject} | Progress: ${page.done}/${page.total} (${pct}%).${dueStr}\nCurrent exercise (id=${ex.id}, difficulty=${ex.difficulty}): "${ex.description}"\nYou must present THIS exact exercise to her and work through it before calling mark_exercise. Only call it with status="solved" once she has actually reached the correct final answer to it in this conversation. If she wants to skip it or stop without solving it, call status="skipped" — never "solved". Total exercises remaining on this page (including this one): ${page.total - page.done}.`,
     activeExerciseId: ex.id,
   };
 }
@@ -263,7 +267,7 @@ router.post('/', async (req, res) => {
 
     let anthropicMessages = [...priorMessages, ...messages]
       .filter(m => m.content && (typeof m.content === 'string' ? m.content.trim() : m.content.length > 0))
-      .slice(-20);
+      .slice(-40);
 
     const hasFiles = files && files.length > 0;
     if (hasFiles) {
