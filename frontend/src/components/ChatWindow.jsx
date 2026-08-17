@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import MessageBubble from './MessageBubble.jsx';
 import FileUpload from './FileUpload.jsx';
+import WorkPagesPanel from './WorkPagesPanel.jsx';
 
 const API_URL = import.meta.env.VITE_API_URL || '';
 
@@ -14,6 +15,7 @@ export default function ChatWindow({ studentId, pin, onBack }) {
   const [input, setInput] = useState('');
   const [pendingFiles, setPendingFiles] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [showWork, setShowWork] = useState(false);
   const sessionId = useRef(crypto.randomUUID());
   const bottomRef = useRef(null);
   const textareaRef = useRef(null);
@@ -103,7 +105,17 @@ export default function ChatWindow({ studentId, pin, onBack }) {
             Here to help you learn, {student.emoji} {student.name}!
           </div>
         </div>
+        <button
+          onClick={() => setShowWork(true)}
+          title="My Work"
+          style={{
+            background: 'none', border: 'none', cursor: 'pointer',
+            fontSize: 22, padding: '0 4px', opacity: 0.7, lineHeight: 1,
+          }}
+        >📋</button>
       </div>
+
+      <WorkPagesPanel studentId={studentId} pin={pin} open={showWork} onClose={() => setShowWork(false)} />
 
       {/* Messages */}
       <div style={{

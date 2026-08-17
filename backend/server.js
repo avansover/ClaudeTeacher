@@ -6,6 +6,7 @@ import { fileURLToPath } from 'url';
 import chatRouter from './routes/chat.js';
 import vocabRouter from './routes/vocab.js';
 import parentRouter from './routes/parent.js';
+import pagesRouter from './routes/pages.js';
 import { initSchema } from './db.js';
 
 const app = express();
@@ -27,6 +28,7 @@ app.use('/api', (req, res, next) => {
 
 app.use('/api/chat', chatRouter);
 app.use('/api/vocab', vocabRouter);
+app.use('/api/pages', pagesRouter);
 
 const distPath = path.join(__dirname, '..', 'frontend', 'dist');
 app.use(express.static(distPath));
