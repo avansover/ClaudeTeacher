@@ -302,8 +302,10 @@ router.post('/', async (req, res) => {
     const markCall = response.content.find(b => b.type === 'tool_use' && b.name === 'mark_exercise');
     const docCall  = response.content.find(b => b.type === 'tool_use' && b.name === 'save_document');
 
-    // If Claude only returned tool calls, follow up to get the student response
-    if (!rawText && (markCall || docCall)) {
+    // If Claude made tool calls, follow up so it can finish its response with the tool result in hand.
+    // Any text emitted alongside the tool call in the same turn is a lead-in, not the final reply —
+    // Claude hasn't seen the tool result yet, so that text is often left mid-sentence.
+    if (markCall || docCall) {
       const toolResults = [];
       if (markCall) toolResults.push({ type: 'tool_result', tool_use_id: markCall.id, content: 'Done.' });
       if (docCall)  toolResults.push({ type: 'tool_result', tool_use_id: docCall.id,  content: 'Saved.' });
