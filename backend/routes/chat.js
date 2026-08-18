@@ -183,6 +183,28 @@ async function buildWorkPageContext(studentId) {
   };
 }
 
+// Full, accurate overview of every work page the student has — not just the current one.
+// Runs on every message so Claude never has to guess or ask for a photo to answer "what pages do I have".
+async function buildAllPagesContext(studentId) {
+  const { rows } = await pool.query(`
+    SELECT wp.title, wp.subject, wp.status,
+           COUNT(e.id) AS total,
+           COUNT(e.id) FILTER (WHERE e.status IN ('solved','skipped')) AS done
+    FROM work_pages wp
+    LEFT JOIN exercises e ON e.page_id = wp.id
+    WHERE wp.student_id = $1 AND wp.status IN ('active', 'completed')
+    GROUP BY wp.id
+    ORDER BY (wp.status = 'active') DESC, wp.created_at DESC
+  `, [studentId]);
+
+  if (!rows.length) {
+    return `\n\nALL WORK PAGES: she has none yet. If she asks about pages or exercises, tell her there aren't any yet — don't ask her to send a photo to find out, there is nothing to find.`;
+  }
+
+  const lines = rows.map(p => `- "${p.title}" (${p.subject}): ${p.done}/${p.total} solved${p.status === 'completed' ? ' — fully completed' : ''}`).join('\n');
+  return `\n\nALL WORK PAGES (this is complete and accurate — this is every page she has, nothing is hidden from you):\n${lines}\nIf she asks what pages/exercises she has, how many are left, or for a status update, answer directly from this list. NEVER ask her to photograph or send a work page to find out what's on it or how many exercises remain — you already know. Only ask for a photo/PDF for material that is NOT one of these work pages (e.g. a worksheet she wants checked that wasn't planned through the parent). If none of these pages is active right now, don't resume or reference an old exercise from earlier in the conversation history — treat it as done and wait for her to say what she wants to work on.`;
+}
+
 async function saveDocument(studentId, sessionId, data) {
   const { rows } = await pool.query(
     `INSERT INTO documents (student_id, session_id, type, subject, description, content, score)
@@ -262,8 +284,9 @@ router.post('/', async (req, res) => {
 
     // Work page context on every message (state changes as exercises are solved)
     const { context: workPageContext, activeExerciseId } = await buildWorkPageContext(studentId);
+    const allPagesContext = await buildAllPagesContext(studentId);
 
-    const systemPrompt = buildSystemPrompt(student.promptFile, profile) + proactiveContext + workPageContext;
+    const systemPrompt = buildSystemPrompt(student.promptFile, profile) + proactiveContext + workPageContext + allPagesContext;
 
     let anthropicMessages = [...priorMessages, ...messages]
       .filter(m => m.content && (typeof m.content === 'string' ? m.content.trim() : m.content.length > 0))
