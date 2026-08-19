@@ -1,5 +1,8 @@
 // Shared lightweight renderer for the light markdown Claude uses: **bold**, --- dividers,
-// and \frac{a}{b} fractions rendered as a real stacked numerator/denominator (no math library).
+// and {{frac|a|b}} fractions rendered as a real stacked numerator/denominator (no math library).
+// Deliberately backslash-free: a \frac{} syntax broke when Claude filled a tool call's JSON directly —
+// \f is a real JSON escape (form feed), so a single un-escaped backslash silently corrupted the data
+// before it ever reached this code. {{frac|a|b}} has no backslash, so there's nothing to escape.
 
 function Fraction({ num, den }) {
   return (
@@ -13,10 +16,10 @@ function Fraction({ num, den }) {
   );
 }
 
-const TOKEN_RE = /(\*\*[^*]+\*\*|\\frac\{[^{}]+\}\{[^{}]+\})/g;
-const FRAC_RE = /^\\frac\{([^{}]+)\}\{([^{}]+)\}$/;
+const TOKEN_RE = /(\*\*[^*]+\*\*|\{\{frac\|[^|{}]+\|[^|{}]+\}\})/g;
+const FRAC_RE = /^\{\{frac\|([^|{}]+)\|([^|{}]+)\}\}$/;
 
-// Recursive so a fraction nested inside **bold** (e.g. "**3 \frac{2}{7}**") still renders as a real fraction
+// Recursive so a fraction nested inside **bold** (e.g. "**3 {{frac|2|7}}**") still renders as a real fraction
 // instead of the whole bold span being treated as one opaque chunk of text.
 function renderInline(text, keyPrefix) {
   return text.split(TOKEN_RE).filter(Boolean).map((part, j) => {
