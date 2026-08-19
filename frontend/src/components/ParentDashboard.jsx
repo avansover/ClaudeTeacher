@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import ParentPlanChat from './ParentPlanChat.jsx';
 import ParentVocabWords from './ParentVocabWords.jsx';
+import { renderRichText } from '../lib/richText.jsx';
 
 const API = import.meta.env.VITE_API_URL || '';
 
@@ -196,7 +197,7 @@ export default function ParentDashboard({ parentPin, onLogout }) {
                           <div key={ex.id} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 12 }}>
                             <span>{statusIcon(ex.status)}</span>
                             <span style={{ color: 'var(--text-muted)' }}>{i + 1}.</span>
-                            <span style={{ flex: 1 }}>{ex.description}</span>
+                            <div style={{ flex: 1 }}>{renderRichText(ex.description)}</div>
                             <span style={{ color: 'var(--text-muted)', flexShrink: 0 }}>{ex.difficulty}</span>
                           </div>
                         ))}

@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { renderRichText } from '../lib/richText.jsx';
 
 const API = import.meta.env.VITE_API_URL || '';
 
@@ -193,9 +194,9 @@ export default function ParentPlanChat({ studentId, studentName, parentPin, onBa
             background: msg.role === 'user' ? 'var(--primary)' : 'var(--bubble-ai)',
             color: msg.role === 'user' ? '#fff' : 'var(--text)',
             borderRadius: msg.role === 'user' ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
-            fontSize: 14, lineHeight: 1.5, whiteSpace: 'pre-wrap',
+            fontSize: 14, lineHeight: 1.5,
           }}>
-            {msg.content}
+            {renderRichText(msg.content)}
           </div>
         ))}
         {loading && (

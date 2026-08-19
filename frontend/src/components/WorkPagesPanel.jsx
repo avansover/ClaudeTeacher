@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { renderRichText } from '../lib/richText.jsx';
 
 const API = import.meta.env.VITE_API_URL || '';
 
@@ -93,7 +94,7 @@ export default function WorkPagesPanel({ studentId, pin, open, onClose }) {
                     <div key={ex.id} style={{ display: 'flex', gap: 6, fontSize: 12, alignItems: 'flex-start' }}>
                       <span style={{ flexShrink: 0 }}>{STATUS_ICON[ex.status] || '⬜'}</span>
                       <span style={{ color: 'var(--text-muted)', flexShrink: 0 }}>{i + 1}.</span>
-                      <span style={{ flex: 1 }} dir={isRtl(ex.description) ? 'rtl' : 'ltr'}>{ex.description}</span>
+                      <div style={{ flex: 1 }} dir={isRtl(ex.description) ? 'rtl' : 'ltr'}>{renderRichText(ex.description)}</div>
                     </div>
                   ))}
                 </div>

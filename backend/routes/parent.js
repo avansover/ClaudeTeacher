@@ -80,7 +80,8 @@ router.post('/chat', async (req, res) => {
 This page is for ${subjectLabel} ONLY — all exercises must be ${subjectLabel} exercises. Do not mix in other subjects.
 Help him design clear, practical exercises. Ask about number of exercises, difficulty level, and specific topics if not specified.
 Once you have enough information, propose a concrete numbered list of exercises so Amir can review and lock them in.
-Be concise. Respond in whatever language Amir uses (Hebrew or English).`;
+Be concise. Respond in whatever language Amir uses (Hebrew or English).
+When writing a fraction, use \\frac{numerator}{denominator} notation (e.g. \\frac{2}{7}) — it renders as a real stacked fraction in the UI. Use it for every fraction, including inside mixed numbers (e.g. "3 \\frac{2}{7}").`;
 
   try {
     const response = await client.messages.create({
@@ -108,7 +109,7 @@ router.post('/pages/lock', async (req, res) => {
     const result = await client.messages.create({
       model: MODEL,
       max_tokens: 4096,
-      system: `You are extracting structured exercise data from a planning conversation. The conversation may be in Hebrew or English. All exercises are for the subject: ${lockedSubject}. Your job is to identify every exercise that was discussed and agreed upon, and save them using the save_work_page tool. Write each exercise description clearly so the student can understand what to do — in the same language used in the conversation.`,
+      system: `You are extracting structured exercise data from a planning conversation. The conversation may be in Hebrew or English. All exercises are for the subject: ${lockedSubject}. Your job is to identify every exercise that was discussed and agreed upon, and save them using the save_work_page tool. Write each exercise description clearly so the student can understand what to do — in the same language used in the conversation. When a description includes a fraction, write it as \\frac{numerator}{denominator} (e.g. \\frac{2}{7}) so it renders as a real stacked fraction — including inside mixed numbers, e.g. "3 \\frac{2}{7}".`,
       tools: [{
         name: 'save_work_page',
         description: 'Extract and save the agreed work page and exercises from the conversation',
