@@ -83,8 +83,13 @@ export async function initSchema() {
       status      VARCHAR(20)  NOT NULL DEFAULT 'pending',
       attempts    JSONB        NOT NULL DEFAULT '[]',
       solved_at   TIMESTAMPTZ,
-      created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+      created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+      answer      TEXT
     );
+
+    -- Add answer column if upgrading from earlier schema. Nullable — older exercises never had
+    -- a computed answer and fall back to live grading exactly as before.
+    ALTER TABLE exercises ADD COLUMN IF NOT EXISTS answer TEXT;
 
     CREATE TABLE IF NOT EXISTS documents (
       id          SERIAL       PRIMARY KEY,

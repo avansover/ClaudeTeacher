@@ -109,7 +109,9 @@ router.post('/pages/lock', async (req, res) => {
     const result = await client.messages.create({
       model: MODEL,
       max_tokens: 4096,
-      system: `You are extracting structured exercise data from a planning conversation. The conversation may be in Hebrew or English. All exercises are for the subject: ${lockedSubject}. Your job is to identify every exercise that was discussed and agreed upon, and save them using the save_work_page tool. Write each exercise description clearly so the student can understand what to do — in the same language used in the conversation. When a description includes a fraction, write it as {{frac|numerator|denominator}} (e.g. {{frac|2|7}}) so it renders as a real stacked fraction — including inside mixed numbers, e.g. "3 {{frac|2|7}}". Write it exactly like that, no backslash — this value goes directly into a tool call argument, and a backslash there is not safe.`,
+      system: `You are extracting structured exercise data from a planning conversation. The conversation may be in Hebrew or English. All exercises are for the subject: ${lockedSubject}. Your job is to identify every exercise that was discussed and agreed upon, and save them using the save_work_page tool. Write each exercise description clearly so the student can understand what to do — in the same language used in the conversation. When a description includes a fraction, write it as {{frac|numerator|denominator}} (e.g. {{frac|2|7}}) so it renders as a real stacked fraction — including inside mixed numbers, e.g. "3 {{frac|2|7}}". Write it exactly like that, no backslash — this value goes directly into a tool call argument, and a backslash there is not safe.
+
+For every exercise, also work out and record the correct final answer in the "answer" field. Take your time and double-check your own arithmetic here — this is the one moment this answer gets computed carefully, and it becomes the ground truth a tutor will later grade the student against, so a mistake here means a correct student answer could get marked wrong later. Write the answer as a plain value (e.g. "23/7", "x = 261", "39865") — no explanation, just the final answer.`,
       tools: [{
         name: 'save_work_page',
         description: 'Extract and save the agreed work page and exercises from the conversation',
@@ -124,8 +126,9 @@ router.post('/pages/lock', async (req, res) => {
                 properties: {
                   description: { type: 'string', description: 'The exercise as the student will see it' },
                   difficulty:  { type: 'string', enum: ['easy', 'medium', 'hard'] },
+                  answer:      { type: 'string', description: 'The correct final answer, computed carefully — plain value only, no explanation' },
                 },
-                required: ['description', 'difficulty'],
+                required: ['description', 'difficulty', 'answer'],
               },
             },
           },
@@ -156,9 +159,9 @@ router.post('/pages/lock', async (req, res) => {
     for (let i = 0; i < data.exercises.length; i++) {
       const ex = data.exercises[i];
       await pool.query(
-        `INSERT INTO exercises (page_id, order_index, description, subject, difficulty)
-         VALUES ($1, $2, $3, $4, $5)`,
-        [page.id, i, ex.description, lockedSubject, ex.difficulty]
+        `INSERT INTO exercises (page_id, order_index, description, subject, difficulty, answer)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [page.id, i, ex.description, lockedSubject, ex.difficulty, ex.answer || null]
       );
     }
 
